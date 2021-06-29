@@ -1,21 +1,17 @@
 #include <ros/ros.h>
-#include <controller_manager/controller_manager.h>
-#include <hardware_interface/joint_command_interface.h>
-#include <hardware_interface/joint_state_interface.h>
-#include <hardware_interface/robot_hw.h>
 #include <realtime_tools/realtime_buffer.h>
 #include <std_msgs/Float64.h>
 #include <dynamic_reconfigure/server.h>
+#include "wheel_msgs/msg/wheel_angles.hpp"
+#include "wheel_msgs/msg/wheel_speeds.hpp"
 #include "hoverboard_driver/HoverboardConfig.h"
 #include "hoverboard_driver/pid.h"
 #include "protocol.h"
 
-class HoverboardAPI;
-
-class Hoverboard : public hardware_interface::RobotHW {
+class Hoverboard{
 public:
-    Hoverboard();
-    ~Hoverboard();
+    Hoverboard(); //Constructor
+    ~Hoverboard(); //Destructor
     
     void read();
     void write(const ros::Time& time, const ros::Duration& period);
