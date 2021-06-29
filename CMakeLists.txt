@@ -22,13 +22,22 @@ find_package(ament_cmake REQUIRED)
 # find_package(<dependency> REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(std_msgs REQUIRED)
+# Add custom msgs
+find_package(wheel_msgs REQUIRED)
 
 add_executable(hello_world src/hello_world.cpp)
-ament_target_dependencies(hello_world rclcpp std_msgs)
+ament_target_dependencies(hello_world rclcpp std_msgs wheel_msgs)
 
+# Install C files for ros2 run.
 install(TARGETS
   hello_world
   DESTINATION lib/${PROJECT_NAME})
+
+# Install launch files.
+install(DIRECTORY
+  launch
+  DESTINATION share/${PROJECT_NAME}/
+)
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
@@ -40,13 +49,5 @@ if(BUILD_TESTING)
   #set(ament_cmake_cpplint_FOUND TRUE)
   ament_lint_auto_find_test_dependencies()
 endif()
-
-
-# Install launch files.
-install(DIRECTORY
-  launch
-  DESTINATION share/${PROJECT_NAME}/
-)
-
 
 ament_package()
