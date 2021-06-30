@@ -1,5 +1,5 @@
 #pragma once
 
-#define PORT "/dev/ttyTHS1"
+#define PORT "/dev/ttyUSB0"
 #define DIRECTION_CORRECTION 1
 

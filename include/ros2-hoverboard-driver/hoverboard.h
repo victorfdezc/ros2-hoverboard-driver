@@ -1,47 +1,48 @@
-#include <ros/ros.h>
-#include <realtime_tools/realtime_buffer.h>
-#include <std_msgs/Float64.h>
-#include <dynamic_reconfigure/server.h>
-#include "wheel_msgs/msg/wheel_angles.hpp"
+#include "rclcpp/rclcpp.hpp"
 #include "wheel_msgs/msg/wheel_speeds.hpp"
-#include "hoverboard_driver/HoverboardConfig.h"
-#include "hoverboard_driver/pid.h"
+#include "std_msgs/msg/float64.hpp"
+#include "std_msgs/msg/string.hpp"
+
+#include "config.h"
 #include "protocol.h"
 
-class Hoverboard{
+#include <unistd.h>
+#include <fcntl.h>
+#include <termios.h>
+
+#include <functional>
+#include <memory>
+
+using namespace std::chrono_literals;
+
+class Hoverboard : public rclcpp::Node {
 public:
     Hoverboard(); //Constructor
     ~Hoverboard(); //Destructor
     
-    void read();
-    void write(const ros::Time& time, const ros::Duration& period);
-    void tick();
- private:
-    void protocol_recv (char c);
+    void read(); // Function to read data coming from BLDC controller
+    void write(); // Function to send comand references to the BLDC controller
  
-    hardware_interface::JointStateInterface joint_state_interface;
-    hardware_interface::VelocityJointInterface velocity_joint_interface;
+ private:
+    void protocol_recv (char c); // Function to recontruct serial packets coming from BLDC controller
+    void setpoint_callback(const wheel_msgs::msg::WheelSpeeds msg); // Callback for subscriber
 
-    // The units for wheels are radians (pos), radians per second (vel,cmd), and Netwton metres (eff)
-    struct Joint {
-        std_msgs::Float64 pos;
-        std_msgs::Float64 vel;
-        std_msgs::Float64 eff;
-        std_msgs::Float64 cmd;
-    } joints[2];
+    // ROS2 Publishers
+    rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr vel_pub_[2];
+    rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr cmd_pub_[2];
+    rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr voltage_pub_;
+    rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr temp_pub_;
 
-    // Publishers
-    ros::NodeHandle nh;
-    ros::Publisher vel_pub[2];
-    ros::Publisher cmd_pub[2];
-    ros::Publisher voltage_pub;
-    ros::Publisher temp_pub;
+    // ROS2 Suscriber
+    // TODO : this msg sends setpoints for 4 wheels, but we can control only 2 wheels
+    rclcpp::Subscription<wheel_msgs::msg::WheelSpeeds>::SharedPtr speeds_sub_;
 
-    double wheel_radius;
-    double max_velocity = 0.0;
-    ros::Time last_read;
+    void callback(std_msgs::msg::String::UniquePtr msg);
 
-    // Hoverboard protocol
+    rclcpp::Subscription<std_msgs::msg::String>::SharedPtr subscription_;
+
+
+    // Hoverboard protocol variables
     int port_fd;
     int msg_len = 0;
     char prev_byte = 0;
@@ -49,5 +50,6 @@ public:
     char* p;
     SerialFeedback msg, prev_msg;
 
-    PID pids[2];
+    // Other variables
+    double setpoint[2] = {0,0};
 };

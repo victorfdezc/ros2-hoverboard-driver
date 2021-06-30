@@ -25,12 +25,33 @@ find_package(std_msgs REQUIRED)
 # Add custom msgs
 find_package(wheel_msgs REQUIRED)
 
-add_executable(hello_world src/hello_world.cpp)
-ament_target_dependencies(hello_world rclcpp std_msgs wheel_msgs)
+## TODO : UNDERTSAND BETTER WHAT THESE FUNCTIONS DO
+# Add /include directory so ROS2 is aware of it
+include_directories(include)
+# Add whatever source code we need to compile as a library (its headers can be in /include)
+add_library(hoverboard SHARED
+            src/hoverboard.cpp)
+# Add other dependencies needed by the source code declared above
+ament_target_dependencies(hoverboard rclcpp std_msgs wheel_msgs)
+
+# Add the code we want to compile to have an executable (so ros2 run can execute it)
+add_executable(main src/main.cpp)
+# Declare we need the precompiled library we defined above
+target_link_libraries(main hoverboard)
+# Other dependencies (outsource)
+ament_target_dependencies(main rclcpp std_msgs wheel_msgs)
+
 
 # Install C files for ros2 run.
 install(TARGETS
-  hello_world
+  hoverboard
+  ARCHIVE DESTINATION lib
+  LIBRARY DESTINATION lib
+  RUNTIME DESTINATION bin)
+
+# Install C files for ros2 run.
+install(TARGETS
+  main
   DESTINATION lib/${PROJECT_NAME})
 
 # Install launch files.

@@ -1,66 +1,43 @@
-#include "config.h"
-#include "hoverboard.h"
+#include "ros2-hoverboard-driver/hoverboard.h"
 
-#include <unistd.h>
-#include <fcntl.h>
-#include <termios.h>
-#include <dynamic_reconfigure/server.h>
-#include <rosparam_shortcuts/rosparam_shortcuts.h>
 
-Hoverboard::Hoverboard() {
-    hardware_interface::JointStateHandle left_wheel_state_handle("left_wheel",
-                                &joints[0].pos.data,
-                                &joints[0].vel.data,
-                                &joints[0].eff.data);
-    hardware_interface::JointStateHandle right_wheel_state_handle("right_wheel",
-                                &joints[1].pos.data,
-                                &joints[1].vel.data,
-                                &joints[1].eff.data);
-    joint_state_interface.registerHandle (left_wheel_state_handle);
-    joint_state_interface.registerHandle (right_wheel_state_handle);
-    registerInterface(&joint_state_interface);
+// TODO : remove undesired includes
 
-    hardware_interface::JointHandle left_wheel_vel_handle(
-        joint_state_interface.getHandle("left_wheel"),
-        &joints[0].cmd.data);
-    hardware_interface::JointHandle right_wheel_vel_handle(
-        joint_state_interface.getHandle("right_wheel"),
-        &joints[1].cmd.data);
-    velocity_joint_interface.registerHandle (left_wheel_vel_handle);
-    velocity_joint_interface.registerHandle (right_wheel_vel_handle);
-    registerInterface(&velocity_joint_interface);
+Hoverboard::Hoverboard() 
+: Node("hoverboard_driver_node") // Member initialization for ROS2 node
+{
+    // Constructor implementation
 
     // These publishers are only for debugging purposes
-    vel_pub[0]    = nh.advertise<std_msgs::Float64>("hoverboard/left_wheel/velocity", 3);
-    vel_pub[1]    = nh.advertise<std_msgs::Float64>("hoverboard/right_wheel/velocity", 3);
-    cmd_pub[0]    = nh.advertise<std_msgs::Float64>("hoverboard/left_wheel/cmd", 3);
-    cmd_pub[1]    = nh.advertise<std_msgs::Float64>("hoverboard/right_wheel/cmd", 3);
-    voltage_pub   = nh.advertise<std_msgs::Float64>("hoverboard/battery_voltage", 3);
-    temp_pub      = nh.advertise<std_msgs::Float64>("hoverboard/temperature", 3);
+    vel_pub_[0]    = create_publisher<std_msgs::msg::Float64>("hoverboard/left_wheel/velocity", 10);
+    vel_pub_[1]    = create_publisher<std_msgs::msg::Float64>("hoverboard/right_wheel/velocity", 10);
+    cmd_pub_[0]    = create_publisher<std_msgs::msg::Float64>("hoverboard/left_wheel/cmd", 10);
+    cmd_pub_[1]    = create_publisher<std_msgs::msg::Float64>("hoverboard/right_wheel/cmd", 10);
+    voltage_pub_   = create_publisher<std_msgs::msg::Float64>("hoverboard/battery_voltage", 10);
+    temp_pub_      = create_publisher<std_msgs::msg::Float64>("hoverboard/temperature", 10);
 
-    std::size_t error = 0;
-    error += !rosparam_shortcuts::get("hoverboard_driver", nh, "hoverboard_velocity_controller/wheel_radius", wheel_radius);
-    error += !rosparam_shortcuts::get("hoverboard_driver", nh, "hoverboard_velocity_controller/linear/x/max_velocity", max_velocity);
-    rosparam_shortcuts::shutdownIfError("hoverboard_driver", error);
+    // Create the subscriber to receive speed setpoints
+    // TODO : SOLVE THIS PROBLEM!!!
+    // speeds_sub_   = create_subscription<wheel_msgs::msg::WheelSpeeds>("wheel_vel_setpoints",
+    //     10, std::bind(&Hoverboard::setpoint_callback, this, std::placeholders::_1));
 
+    subscription_ = create_subscription<std_msgs::msg::String>(
+    "topic",
+    10,
+    std::bind(&Hoverboard::callback, this, std::placeholders::_1));
+    
     // Convert m/s to rad/s
-    max_velocity /= wheel_radius;
-
-    ros::NodeHandle nh_left(nh, "pid/left");
-    ros::NodeHandle nh_right(nh, "pid/right");
-    // Init PID controller
-    pids[0].init(nh_left, 1.0, 0.0, 0.0, 0.01, 1.5, -1.5, true, max_velocity, -max_velocity);
-    pids[0].setOutputLimits(-max_velocity, max_velocity);
-    pids[1].init(nh_right, 1.0, 0.0, 0.0, 0.01, 1.5, -1.5, true, max_velocity, -max_velocity);
-    pids[1].setOutputLimits(-max_velocity, max_velocity);
+    // TODO : take into account the way we send references to the hoverboard controller
+    //max_velocity /= wheel_radius;
 
     if ((port_fd = open(PORT, O_RDWR | O_NOCTTY | O_NDELAY)) < 0) {
-        ROS_FATAL("Cannot open serial port to hoverboard");
-        exit(-1);
+        RCLCPP_ERROR(this->get_logger(), "Cannot open serial port to hoverboard");
+        //exit(-1); // TODO : put this again
     }
     
     // CONFIGURE THE UART -- connecting to the board
     // The flags (defined in /usr/include/termios.h - see http://pubs.opengroup.org/onlinepubs/007908799/xsh/termios.h.html):
+    // TODO : understand this shit
     struct termios options;
     tcgetattr(port_fd, &options);
     options.c_cflag = B115200 | CS8 | CLOCAL | CREAD;		//<Set baud rate
@@ -71,9 +48,25 @@ Hoverboard::Hoverboard() {
     tcsetattr(port_fd, TCSANOW, &options);
 }
 
-Hoverboard::~Hoverboard() {
+Hoverboard::~Hoverboard() { // Destructor implementation
     if (port_fd != -1) 
         close(port_fd);
+}
+
+void Hoverboard::setpoint_callback(const wheel_msgs::msg::WheelSpeeds msg)
+{
+    setpoint[0] = msg.wheel_fr;
+    setpoint[1] = msg.wheel_fl;
+
+    RCLCPP_INFO(this->get_logger(), "I heard something");
+}
+
+void Hoverboard::callback(std_msgs::msg::String::UniquePtr msg)
+{
+    // setpoint[0] = msg->wheel_fr; // TODO : FIX THIS!!
+    // setpoint[1] = msg->wheel_fl;
+
+    RCLCPP_INFO(this->get_logger(), "I heard something");
 }
 
 void Hoverboard::read() {
@@ -84,16 +77,16 @@ void Hoverboard::read() {
         while ((r = ::read(port_fd, &c, 1)) > 0 && i++ < 1024)
             protocol_recv(c);
 
-        if (i > 0)
-        last_read = ros::Time::now();
+        // if (i > 0)
+        // last_read = ros::Time::now();
 
         if (r < 0 && errno != EAGAIN)
-            ROS_ERROR("Reading from serial %s failed: %d", PORT, r);
+            RCLCPP_ERROR(this->get_logger(), "Reading from serial %s failed: %d", PORT, r);
     }
 
-    if ((ros::Time::now() - last_read).toSec() > 1) {
-        ROS_FATAL("Timeout reading from serial %s failed", PORT);
-    }
+    // if ((ros::Time::now() - last_read).toSec() > 1) {
+    //     RCLCPP_ERROR(this->get_logger(), "Timeout reading from serial %s failed", PORT);
+    // }
 }
 
 void Hoverboard::protocol_recv (char byte) {
@@ -123,50 +116,39 @@ void Hoverboard::protocol_recv (char byte) {
             msg.cmdLed);
 
         if (msg.start == START_FRAME && msg.checksum == checksum) {
-            std_msgs::Float64 f;
+            std_msgs::msg::Float64 f;
 
             f.data = (double)msg.batVoltage/100.0;
-            voltage_pub.publish(f);
+            voltage_pub_->publish(f);
 
             f.data = (double)msg.boardTemp/10.0;
-            temp_pub.publish(f);
+            temp_pub_->publish(f);
 
-            // Convert RPM to RAD/S
-            joints[0].vel.data = DIRECTION_CORRECTION * (abs(msg.speedL_meas) * 0.10472);
-            joints[1].vel.data = DIRECTION_CORRECTION * (abs(msg.speedR_meas) * 0.10472);
+            f.data = (double)msg.speedL_meas;
+            vel_pub_[0]->publish(f);
+            f.data = (double)msg.speedR_meas;
+            vel_pub_[1]->publish(f);
 
-            vel_pub[0].publish(joints[0].vel);
-            vel_pub[1].publish(joints[1].vel);
+            f.data = (double)msg.cmd1;
+            cmd_pub_[0]->publish(f);
+            f.data = (double)msg.cmd2;
+            cmd_pub_[1]->publish(f);
         } else {
-            ROS_WARN("Hoverboard checksum mismatch: %d vs %d", msg.checksum, checksum);
+            RCLCPP_INFO(this->get_logger(), "Hoverboard checksum mismatch: %d vs %d", msg.checksum, checksum);
         }
         msg_len = 0;
     }
     prev_byte = byte;
 }
 
-void Hoverboard::write(const ros::Time& time, const ros::Duration& period) {
+void Hoverboard::write() {
     if (port_fd == -1) {
-        ROS_ERROR("Attempt to write on closed serial");
+        RCLCPP_ERROR(this->get_logger(), "Attempt to write on closed serial");
         return;
     }
-    // Inform interested parties about the commands we've got
-    cmd_pub[0].publish(joints[0].cmd);
-    cmd_pub[1].publish(joints[1].cmd);
-
-    double pid_outputs[2];
-    pid_outputs[0] = pids[0](joints[0].vel.data, joints[0].cmd.data, period);
-    pid_outputs[1] = pids[1](joints[1].vel.data, joints[1].cmd.data, period);
-
-    // Convert PID outputs in RAD/S to RPM
-    double set_speed[2] = {
-        pid_outputs[0] / 0.10472,
-        pid_outputs[1] / 0.10472
-    };
-
     // Calculate steering from difference of left and right
-    const double speed = (set_speed[0] + set_speed[1])/2.0;
-    const double steer = (set_speed[0] - speed)*2.0;
+    const double speed = (setpoint[0] + setpoint[1])/2.0;
+    const double steer = (setpoint[0] - setpoint[1])*2.0;
 
     SerialCommand command;
     command.start = (uint16_t)START_FRAME;
@@ -176,7 +158,7 @@ void Hoverboard::write(const ros::Time& time, const ros::Duration& period) {
 
     int rc = ::write(port_fd, (const void*)&command, sizeof(command));
     if (rc < 0) {
-        ROS_ERROR("Error writing to hoverboard serial port");
+        RCLCPP_ERROR(this->get_logger(), "Error writing to hoverboard serial port");
     }
 }
 
