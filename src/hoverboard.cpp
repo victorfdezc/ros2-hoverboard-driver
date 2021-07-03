@@ -1,8 +1,6 @@
 #include "ros2-hoverboard-driver/hoverboard.hpp"
 
 
-// TODO : remove undesired includes
-
 Hoverboard::Hoverboard() 
 : Node("hoverboard_driver_node") // Member initialization for ROS2 node
 {
@@ -17,7 +15,6 @@ Hoverboard::Hoverboard()
     temp_pub_      = create_publisher<std_msgs::msg::Float64>("hoverboard/temperature", 10);
 
     // Create the subscriber to receive speed setpoints
-    // TODO : SOLVE THIS PROBLEM!!!
     speeds_sub_   = create_subscription<wheel_msgs::msg::WheelSpeeds>("wheel_vel_setpoints",
                     10, std::bind(&Hoverboard::setpoint_callback, this, std::placeholders::_1));
     
@@ -50,8 +47,8 @@ Hoverboard::~Hoverboard() { // Destructor implementation
 
 void Hoverboard::setpoint_callback(wheel_msgs::msg::WheelSpeeds::UniquePtr msg)
 {
-    setpoint[0] = msg->wheel_fr;
-    setpoint[1] = msg->wheel_fl;
+    setpoint[0] = msg->right_wheel;
+    setpoint[1] = msg->left_wheel;
 
     RCLCPP_INFO(this->get_logger(), "I heard something: %f, %f", setpoint[0], setpoint[1]);
 }

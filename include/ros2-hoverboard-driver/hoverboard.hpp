@@ -47,5 +47,5 @@ public:
     SerialFeedback msg, prev_msg;
 
     // Other variables
-    float setpoint[2] = {0,0};
+    float setpoint[2] = {0,0}; // Right , Left
 };
