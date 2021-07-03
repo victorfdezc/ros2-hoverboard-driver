@@ -18,13 +18,8 @@ Hoverboard::Hoverboard()
 
     // Create the subscriber to receive speed setpoints
     // TODO : SOLVE THIS PROBLEM!!!
-    // speeds_sub_   = create_subscription<wheel_msgs::msg::WheelSpeeds>("wheel_vel_setpoints",
-    //     10, std::bind(&Hoverboard::setpoint_callback, this, std::placeholders::_1));
-
-    subscription_ = create_subscription<std_msgs::msg::String>(
-    "topic",
-    10,
-    std::bind(&Hoverboard::callback, this, std::placeholders::_1));
+    speeds_sub_   = create_subscription<wheel_msgs::msg::WheelSpeeds>("wheel_vel_setpoints",
+                    10, std::bind(&Hoverboard::setpoint_callback, this, std::placeholders::_1));
     
     // Convert m/s to rad/s
     // TODO : take into account the way we send references to the hoverboard controller
@@ -53,20 +48,12 @@ Hoverboard::~Hoverboard() { // Destructor implementation
         close(port_fd);
 }
 
-void Hoverboard::setpoint_callback(const wheel_msgs::msg::WheelSpeeds msg)
+void Hoverboard::setpoint_callback(wheel_msgs::msg::WheelSpeeds::UniquePtr msg)
 {
-    setpoint[0] = msg.wheel_fr;
-    setpoint[1] = msg.wheel_fl;
+    setpoint[0] = msg->wheel_fr;
+    setpoint[1] = msg->wheel_fl;
 
-    RCLCPP_INFO(this->get_logger(), "I heard something");
-}
-
-void Hoverboard::callback(std_msgs::msg::String::UniquePtr msg)
-{
-    // setpoint[0] = msg->wheel_fr; // TODO : FIX THIS!!
-    // setpoint[1] = msg->wheel_fl;
-
-    RCLCPP_INFO(this->get_logger(), "I heard something");
+    RCLCPP_INFO(this->get_logger(), "I heard something: %f, %f", setpoint[0], setpoint[1]);
 }
 
 void Hoverboard::read() {

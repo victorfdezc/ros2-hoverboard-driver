@@ -25,7 +25,6 @@ public:
  
  private:
     void protocol_recv (char c); // Function to recontruct serial packets coming from BLDC controller
-    void setpoint_callback(const wheel_msgs::msg::WheelSpeeds msg); // Callback for subscriber
 
     // ROS2 Publishers
     rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr vel_pub_[2];
@@ -36,11 +35,8 @@ public:
     // ROS2 Suscriber
     // TODO : this msg sends setpoints for 4 wheels, but we can control only 2 wheels
     rclcpp::Subscription<wheel_msgs::msg::WheelSpeeds>::SharedPtr speeds_sub_;
-
-    void callback(std_msgs::msg::String::UniquePtr msg);
-
-    rclcpp::Subscription<std_msgs::msg::String>::SharedPtr subscription_;
-
+    // Callback for subscriber
+    void setpoint_callback(wheel_msgs::msg::WheelSpeeds::UniquePtr msg); // Be careful with UniquePtr, in speeds_sub_ definition we remove it... TODO :  understand what UniquePtr is doing!
 
     // Hoverboard protocol variables
     int port_fd;
@@ -51,5 +47,5 @@ public:
     SerialFeedback msg, prev_msg;
 
     // Other variables
-    double setpoint[2] = {0,0};
+    float setpoint[2] = {0,0};
 };
