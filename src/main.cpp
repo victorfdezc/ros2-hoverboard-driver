@@ -1,4 +1,4 @@
-#include "ros2-hoverboard-driver/hoverboard.h"
+#include "ros2-hoverboard-driver/hoverboard.hpp"
 
 int main(int argc, char * argv[])
 {

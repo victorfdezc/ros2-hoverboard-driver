@@ -1,4 +1,4 @@
-#include "ros2-hoverboard-driver/hoverboard.h"
+#include "ros2-hoverboard-driver/hoverboard.hpp"
 
 
 // TODO : remove undesired includes

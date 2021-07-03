@@ -3,8 +3,8 @@
 #include "std_msgs/msg/float64.hpp"
 #include "std_msgs/msg/string.hpp"
 
-#include "config.h"
-#include "protocol.h"
+#include "config.hpp"
+#include "protocol.hpp"
 
 #include <unistd.h>
 #include <fcntl.h>
