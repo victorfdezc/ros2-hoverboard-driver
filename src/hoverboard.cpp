@@ -7,15 +7,18 @@ Hoverboard::Hoverboard()
     // Constructor implementation
 
     // These publishers are only for debugging purposes
-    vel_pub_[0]    = create_publisher<std_msgs::msg::Float64>("hoverboard/left_wheel/velocity", 10);
-    vel_pub_[1]    = create_publisher<std_msgs::msg::Float64>("hoverboard/right_wheel/velocity", 10);
-    cmd_pub_[0]    = create_publisher<std_msgs::msg::Float64>("hoverboard/left_wheel/cmd", 10);
-    cmd_pub_[1]    = create_publisher<std_msgs::msg::Float64>("hoverboard/right_wheel/cmd", 10);
-    voltage_pub_   = create_publisher<std_msgs::msg::Float64>("hoverboard/battery_voltage", 10);
-    temp_pub_      = create_publisher<std_msgs::msg::Float64>("hoverboard/temperature", 10);
+    // TODO : understand this. I think that using this-> for creating subscribers and publishers, makes that those
+    // publishers and subscribers are directly related to the created node. That makes sense for using spin_some(node), since
+    // only the related tasks to "node" will be executed.
+    vel_pub_[0]    = this->create_publisher<std_msgs::msg::Float64>("hoverboard/left_wheel/velocity", 10);
+    vel_pub_[1]    = this->create_publisher<std_msgs::msg::Float64>("hoverboard/right_wheel/velocity", 10);
+    cmd_pub_[0]    = this->create_publisher<std_msgs::msg::Float64>("hoverboard/left_wheel/cmd", 10);
+    cmd_pub_[1]    = this->create_publisher<std_msgs::msg::Float64>("hoverboard/right_wheel/cmd", 10);
+    voltage_pub_   = this->create_publisher<std_msgs::msg::Float64>("hoverboard/battery_voltage", 10);
+    temp_pub_      = this->create_publisher<std_msgs::msg::Float64>("hoverboard/temperature", 10);
 
     // Create the subscriber to receive speed setpoints
-    speeds_sub_   = create_subscription<wheel_msgs::msg::WheelSpeeds>("wheel_vel_setpoints",
+    speeds_sub_   = this->create_subscription<wheel_msgs::msg::WheelSpeeds>("wheel_vel_setpoints",
                     10, std::bind(&Hoverboard::setpoint_callback, this, std::placeholders::_1));
     
     // Convert m/s to rad/s
@@ -24,7 +27,7 @@ Hoverboard::Hoverboard()
 
     if ((port_fd = open(PORT, O_RDWR | O_NOCTTY | O_NDELAY)) < 0) {
         RCLCPP_ERROR(this->get_logger(), "Cannot open serial port to hoverboard");
-        //exit(-1); // TODO : put this again
+        exit(-1); // TODO : put this again
     }
     
     // CONFIGURE THE UART -- connecting to the board
@@ -55,11 +58,13 @@ void Hoverboard::setpoint_callback(wheel_msgs::msg::WheelSpeeds::UniquePtr msg)
 
 void Hoverboard::read() {
     if (port_fd != -1) {
-        unsigned char c;
+        uint8_t c;
         int i = 0, r = 0;
 
-        while ((r = ::read(port_fd, &c, 1)) > 0 && i++ < 1024)
+        while ((r = ::read(port_fd, &c, 1)) > 0 && i++ < 1024){
+            //RCLCPP_INFO(this->get_logger(), "Reading UART");
             protocol_recv(c);
+        }            
 
         // if (i > 0)
         // last_read = ros::Time::now();
@@ -73,12 +78,18 @@ void Hoverboard::read() {
     // }
 }
 
-void Hoverboard::protocol_recv (char byte) {
+void Hoverboard::protocol_recv (uint8_t byte) {
     start_frame = ((uint16_t)(byte) << 8) | prev_byte;
+    //RCLCPP_INFO(this->get_logger(), "Received a byte: %x",(uint8_t)byte);
+    // if ((uint8_t)byte == 0xAB && (uint8_t)prev_byte == 0xCD){
+    //     RCLCPP_INFO(this->get_logger(), "Received Start frame: %x", start_frame);
+    //     RCLCPP_INFO(this->get_logger(), "Received Start frame: %x %x", (byte) << 8, (uint8_t)prev_byte);
+    // }
 
     // Read the start frame
     if (start_frame == START_FRAME) {
-        p = (char*)&msg;
+        //RCLCPP_INFO(this->get_logger(), "Start frame recognised");
+        p = (uint8_t*)&msg;
         *p++ = prev_byte;
         *p++ = byte;
         msg_len = 2;
@@ -130,7 +141,7 @@ void Hoverboard::write() {
         RCLCPP_ERROR(this->get_logger(), "Attempt to write on closed serial");
         return;
     }
-    // Calculate steering from difference of left and right
+    // Calculate steering from difference of left and right //TODO : change this shiiit
     const double speed = (setpoint[0] + setpoint[1])/2.0;
     const double steer = (setpoint[0] - setpoint[1])*2.0;
 

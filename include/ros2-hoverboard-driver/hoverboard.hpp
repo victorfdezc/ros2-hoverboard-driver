@@ -24,7 +24,7 @@ public:
     void write(); // Function to send comand references to the BLDC controller
  
  private:
-    void protocol_recv (char c); // Function to recontruct serial packets coming from BLDC controller
+    void protocol_recv (uint8_t c); // Function to recontruct serial packets coming from BLDC controller
 
     // ROS2 Publishers
     rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr vel_pub_[2];
@@ -40,10 +40,10 @@ public:
 
     // Hoverboard protocol variables
     int port_fd;
-    int msg_len = 0;
-    char prev_byte = 0;
+    unsigned int msg_len = 0;
+    uint8_t prev_byte = 0; // uint8_t is nice to store bytes
     uint16_t start_frame = 0;
-    char* p;
+    uint8_t* p;
     SerialFeedback msg, prev_msg;
 
     // Other variables
